@@ -1,7 +1,7 @@
 Treemaps
 ------------
 
-**[Live demo →]([https://jonthrall-arizona.github.io/Linked-Views/)**
+**[Live demo →]([https://jonthrall-arizona.github.io/Treemaps/)**
 
 Author: Jon Thrall (Jonthrall21@gmail.com)
 
