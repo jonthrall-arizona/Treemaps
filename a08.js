@@ -163,10 +163,28 @@ makeTreeNodeList(data, treeNodeList);
 ////////////////////////////////////////////////////////////////////////
 // Visual Encoding portion
 
-// d3 selection to draw the tree map 
-const colorScale = d3.scaleOrdinal()
-  .domain(d3.range(maxDepth + 1))
-  .range(["#BEB7A4", "#D8A47F", "#A26769", "#582C4D", "#F05D5E", "#FF1B1C", "#FF7F11"]);
+// Sequential blue scale by depth - lighter near the root, darker as the
+// hierarchy goes deeper. Ties this chart's palette to the heatmap in the
+// D3 Introduction project rather than the arbitrary warm palette this used
+// to have.
+const colorScale = d3.scaleSequential(d3.interpolateBlues)
+  .domain([0, maxDepth + 1]);
+
+// Rough heuristic for label/legend text contrast: the Blues scale gets
+// dark enough by depth 2 that white text reads better than dark ink.
+function textColorFor(depth) {
+  return depth <= 1 ? "#1b1e23" : "#ffffff";
+}
+
+// Only label leaf nodes (individual files) - labeling every directory
+// level too would be very noisy given how nested this tree is - and only
+// when the box is large enough for the text to actually be legible.
+function labelVisible(treeNode) {
+  if (treeNode.children !== undefined) return false;
+  const rw = treeNode.rect.x2 - treeNode.rect.x1;
+  const rh = treeNode.rect.y2 - treeNode.rect.y1;
+  return rw > 50 && rh > 18;
+}
 
 let gs = d3.select("#svg")
   .attr("width", winWidth)
@@ -176,7 +194,18 @@ let gs = d3.select("#svg")
   .enter()
   .append("g");
 
-function setAttrs(sel) {
+const rects = gs.append("rect");
+
+// Native <title> tooltip - shows the metrics regardless of which button is
+// currently active, since both are always computed up front.
+rects.append("title")
+  .text(treeNode => `${treeNode.name}\nSize: ${treeNode.size}\nCount: ${treeNode.count}`);
+
+const labels = gs.append("text")
+  .attr("class", "node-label")
+  .text(treeNode => treeNode.children === undefined ? treeNode.name : "");
+
+function setRectAttrs(sel) {
   sel.attr("x", treeNode => treeNode.rect.x1)
     .attr("y", treeNode => treeNode.rect.y1)
     .attr("width", treeNode => treeNode.rect.x2 - treeNode.rect.x1)
@@ -186,46 +215,95 @@ function setAttrs(sel) {
     .attr("stroke-width", 1);
 }
 
-gs.append("rect").call(setAttrs);
+function setLabelAttrs(sel) {
+  sel.attr("x", treeNode => (treeNode.rect.x1 + treeNode.rect.x2) / 2)
+    .attr("y", treeNode => (treeNode.rect.y1 + treeNode.rect.y2) / 2)
+    .attr("fill", treeNode => textColorFor(treeNode.depth))
+    .style("opacity", treeNode => labelVisible(treeNode) ? 1 : 0);
+}
+
+setRectAttrs(rects);
+setLabelAttrs(labels);
+
+// Build the depth legend now that maxDepth and colorScale are known.
+const legendSwatches = d3.select("#legend-swatches");
+for (let depth = 0; depth <= maxDepth; depth++) {
+  const row = legendSwatches.append("div").attr("class", "legend-row");
+  row.append("div")
+    .attr("class", "legend-swatch")
+    .style("background", colorScale(depth));
+  row.append("span").text(`Depth ${depth}`);
+}
 
 
 
 ////////////////////////////////////////////////////////////////////////
 // Callbacks for buttons
-d3.select("#size").on("click", function () {
+
+// Track the current view so a window resize can redraw using whichever
+// mode the user last selected, instead of always snapping back to "Size".
+let currentMetricFn = treeNode => treeNode.size;
+let currentIsBestCut = false;
+
+function setActiveButton(id) {
+  d3.selectAll(".buttons button").classed("is-active", false);
+  d3.select("#" + id).classed("is-active", true);
+}
+
+function redraw(animate) {
   setRectangles(
     { x1: 0, x2: winWidth, y1: 0, y2: winHeight },
     data,
-    function (t) { return t.size; } 
+    currentMetricFn,
+    currentIsBestCut
   );
-  d3.selectAll("rect").transition().duration(1000).call(setAttrs);
+
+  if (animate) {
+    d3.selectAll("#svg rect").transition().duration(1000).call(setRectAttrs);
+    d3.selectAll(".node-label").transition().duration(1000).call(setLabelAttrs);
+  } else {
+    setRectAttrs(d3.selectAll("#svg rect"));
+    setLabelAttrs(d3.selectAll(".node-label"));
+  }
+}
+
+d3.select("#size").on("click", function () {
+  currentMetricFn = treeNode => treeNode.size;
+  currentIsBestCut = false;
+  setActiveButton("size");
+  redraw(true);
 });
 
 d3.select("#count").on("click", function () {
-  setRectangles(
-    { x1: 0, x2: winWidth, y1: 0, y2: winHeight },
-    data,
-    function (t) { return t.count; } 
-  );
-  d3.selectAll("rect").transition().duration(1000).call(setAttrs);
+  currentMetricFn = treeNode => treeNode.count;
+  currentIsBestCut = false;
+  setActiveButton("count");
+  redraw(true);
 });
 
 d3.select("#best-size").on("click", function () {
-  setRectangles(
-    { x1: 0, x2: winWidth, y1: 0, y2: winHeight },
-    data,
-    function (t) { return t.size; }, 
-    true 
-  );
-  d3.selectAll("rect").transition().duration(1000).call(setAttrs);
+  currentMetricFn = treeNode => treeNode.size;
+  currentIsBestCut = true;
+  setActiveButton("best-size");
+  redraw(true);
 });
 
 d3.select("#best-count").on("click", function () {
-  setRectangles(
-    { x1: 0, x2: winWidth, y1: 0, y2: winHeight },
-    data,
-    function (t) { return t.count; },
-    true
-  );
-  d3.selectAll("rect").transition().duration(1000).call(setAttrs);
+  currentMetricFn = treeNode => treeNode.count;
+  currentIsBestCut = true;
+  setActiveButton("best-count");
+  redraw(true);
+});
+
+// Redraw (without animation) on window resize so the treemap always fills
+// the viewport, rather than staying locked to its size at page load.
+let resizeTimer;
+window.addEventListener("resize", function () {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function () {
+    winWidth = window.innerWidth;
+    winHeight = window.innerHeight;
+    d3.select("#svg").attr("width", winWidth).attr("height", winHeight);
+    redraw(false);
+  }, 150);
 });

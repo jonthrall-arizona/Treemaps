@@ -1,20 +1,50 @@
+<!--
+
+Jon Thrall
+CSC 444, Section 001
+
+-->
+
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8"/>
-    <script src="d3.js"></script>
-    <script src="flare.js"></script>
-    <script src="test-cases.js"></script>
-  </head>
-  <body style="padding: 0; margin: 0">
-    <svg id="svg"></svg>
-    <div style="position: absolute; right: 1em; top: 1em">
-      <button id="size">Size</button>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Treemaps — Jon Thrall</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- D3 loaded from CDN rather than vendored locally -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body>
+
+  <svg id="svg"></svg>
+
+  <div class="panel toolbar">
+    <h1>File Hierarchy Treemap</h1>
+    <p>
+      Each box is a file or folder from the
+      <a href="https://github.com/prefuse/Flare" target="_blank" rel="noopener">Flare</a> codebase.
+      Switch what determines box size, and how space is split at each level of the tree.
+    </p>
+    <div class="buttons">
+      <button id="size" class="is-active">Size</button>
       <button id="count">Count</button>
       <button id="best-size">Best Size</button>
       <button id="best-count">Best Count</button>
     </div>
-    <script src="a08.js"></script>
-  </body>
+  </div>
+
+  <div class="panel legend-panel" id="legend-panel">
+    <h2>Nesting depth</h2>
+    <div class="legend-swatches" id="legend-swatches"></div>
+  </div>
+
+  <script src="flare.js"></script>
+  <script src="test-cases.js"></script>
+  <script src="a08.js"></script>
+
+</body>
+
 </html>
-  
